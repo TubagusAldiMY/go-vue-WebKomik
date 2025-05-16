@@ -230,3 +230,55 @@ func GetPagesByChapterID(ctx context.Context, chapterID int64) ([]models.Page, e
 	}
 	return pages, nil
 }
+
+// CreateComic menyimpan komik baru ke database.
+// Ia mengembalikan komik yang baru dibuat atau error.
+// adminID adalah ID pengguna (dari Supabase auth.users.id) yang membuat komik ini.
+func CreateComic(ctx context.Context, input models.Comic, adminID string) (*models.Comic, error) {
+	query := `
+		INSERT INTO comics (title, description, author_name, genre_id, cover_image_url, uploaded_by_admin_id)
+		VALUES ($1, $2, $3, $4, $5, $6)
+		RETURNING id, title, description, author_name, genre_id, cover_image_url, uploaded_by_admin_id, created_at, updated_at;
+	`
+	// Variabel untuk menampung hasil RETURNING, termasuk yang mungkin NULL
+	var createdComic models.Comic
+	//var genreNamePlaceholder *string // Placeholder, karena RETURNING tidak langsung join dengan genre name
+
+	err := DB.QueryRow(ctx, query,
+		input.Title,
+		input.Description,
+		input.AuthorName,
+		input.GenreID,
+		input.CoverImageURL,
+		adminID, // adminID yang bertipe UUID dari Supabase
+	).Scan(
+		&createdComic.ID,
+		&createdComic.Title,
+		&createdComic.Description,
+		&createdComic.AuthorName,
+		&createdComic.GenreID,
+		&createdComic.CoverImageURL,
+		&createdComic.UploadedByAdminID, // Akan berisi adminID
+		&createdComic.CreatedAt,
+		&createdComic.UpdatedAt,
+	)
+
+	if err != nil {
+		return nil, fmt.Errorf("gagal membuat komik di database: %w", err)
+	}
+
+	// Jika genre_id ada, kita mungkin ingin mengambil nama genre untuk dikembalikan
+	// Ini opsional, atau bisa dilakukan di handler jika perlu.
+	if createdComic.GenreID != nil {
+		var genreName string
+		errGenre := DB.QueryRow(ctx, "SELECT name FROM genres WHERE id = $1", *createdComic.GenreID).Scan(&genreName)
+		if errGenre == nil {
+			createdComic.GenreName = &genreName
+		} else if errGenre != pgx.ErrNoRows {
+			// Log error tapi jangan gagalkan pembuatan komik utama
+			log.Printf("Peringatan: Gagal mengambil nama genre untuk komik baru ID %d: %v", createdComic.ID, errGenre)
+		}
+	}
+
+	return &createdComic, nil
+}

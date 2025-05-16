@@ -74,3 +74,33 @@ func AuthMiddleware(cfg *config.Config) gin.HandlerFunc {
 		c.Next() // Lanjutkan ke handler berikutnya
 	}
 }
+
+// AdminRoleMiddleware memeriksa apakah pengguna yang terotentikasi memiliki peran 'admin'.
+// Middleware ini harus dijalankan SETELAH AuthMiddleware.
+func AdminRoleMiddleware() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		// Ambil userRole dari context yang sudah di-set oleh AuthMiddleware
+		userRoleVal, exists := c.Get("userRole")
+		if !exists {
+			// Ini bisa terjadi jika AuthMiddleware tidak dijalankan sebelumnya
+			// atau jika 'userRole' tidak ada di token dan tidak di-set default.
+			// AuthMiddleware kita saat ini tidak men-set default jika role tidak ada, jadi ini skenario valid.
+			c.AbortWithStatusJSON(http.StatusForbidden, gin.H{"error": "Peran pengguna tidak ditemukan di konteks. Akses ditolak."})
+			return
+		}
+
+		userRole, ok := userRoleVal.(string)
+		if !ok {
+			// Tipe userRole di context bukan string, ini seharusnya tidak terjadi.
+			c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"error": "Kesalahan internal: tipe peran pengguna tidak valid."})
+			return
+		}
+
+		if strings.ToLower(userRole) != "admin" {
+			c.AbortWithStatusJSON(http.StatusForbidden, gin.H{"error": "Akses ditolak: membutuhkan peran admin."})
+			return
+		}
+
+		c.Next() // Pengguna adalah admin, lanjutkan ke handler berikutnya.
+	}
+}

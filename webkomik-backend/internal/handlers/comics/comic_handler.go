@@ -75,3 +75,48 @@ func GetComicDetailHandler(c *gin.Context) {
 
 	c.JSON(http.StatusOK, gin.H{"data": comic})
 }
+
+// CreateComicHandler menangani pembuatan komik baru.
+// Hanya admin yang bisa mengakses endpoint ini.
+func CreateComicHandler(c *gin.Context) {
+	var input CreateComicInput // Struct untuk binding dan validasi
+
+	// Bind JSON body ke struct input dan validasi
+	if err := c.ShouldBindJSON(&input); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Input tidak valid", "details": err.Error()})
+		return
+	}
+
+	// Ambil userID (adminID) dari context yang di-set oleh AuthMiddleware
+	adminIDVal, exists := c.Get("userID")
+	if !exists {
+		// Seharusnya tidak terjadi jika AuthMiddleware dan AdminRoleMiddleware bekerja dengan benar
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "UserID admin tidak ditemukan di context"})
+		return
+	}
+	adminID, ok := adminIDVal.(string)
+	if !ok || adminID == "" {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Format UserID admin tidak valid"})
+		return
+	}
+
+	// Buat objek models.Comic dari input
+	comicData := models.Comic{
+		Title:         input.Title,
+		Description:   input.Description,
+		AuthorName:    input.AuthorName,
+		GenreID:       input.GenreID,
+		CoverImageURL: input.CoverImageURL,
+		// UploadedByAdminID akan diisi oleh fungsi database dari parameter adminID
+	}
+
+	createdComic, err := database.CreateComic(c.Request.Context(), comicData, adminID)
+	if err != nil {
+		c.Error(err)
+		log.Printf("Error saat membuat komik: %v\nInput: %+v\nAdminID: %s\n", err, input, adminID)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Gagal menyimpan komik baru"})
+		return
+	}
+
+	c.JSON(http.StatusCreated, gin.H{"data": createdComic})
+}

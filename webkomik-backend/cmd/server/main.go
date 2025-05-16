@@ -63,31 +63,24 @@ func main() {
 	api := router.Group("/api")
 	{
 		// --- Route Publik di dalam /api ---
-		// Endpoint untuk mendapatkan semua komik
 		api.GET("/comics", comicshandler.GetAllComicsHandler)
-		// Endpoint untuk mendapatkan detail satu komik berdasarkan ID
 		api.GET("/comics/:id", comicshandler.GetComicDetailHandler)
 
 		// --- Grup yang memerlukan otentikasi ---
-		// Semua route di dalam grup ini akan dilindungi oleh AuthMiddleware
-		authRequired := api.Group("/") // Bisa juga dinamai "/protected" atau semacamnya
+		authRequired := api.Group("/") // Base untuk semua yang butuh login
 		authRequired.Use(middleware.AuthMiddleware(cfg))
 		{
-			// Contoh route yang dilindungi: mendapatkan informasi pengguna saat ini
 			authRequired.GET("/me", func(c *gin.Context) {
+				// ... (kode /me) ...
 				userID, exists := c.Get("userID")
 				if !exists {
-					// Ini seharusnya tidak terjadi jika middleware bekerja dengan benar
-					// dan token valid memiliki userID
 					c.JSON(http.StatusInternalServerError, gin.H{"error": "UserID tidak ditemukan di context"})
 					return
 				}
-
 				userRole, roleExists := c.Get("userRole")
 				if !roleExists {
-					userRole = "user" // Default jika 'role' tidak ada di token
+					userRole = "user"
 				}
-
 				c.JSON(http.StatusOK, gin.H{
 					"message":  "Anda berhasil mengakses endpoint yang dilindungi!",
 					"userID":   userID,
@@ -95,17 +88,16 @@ func main() {
 				})
 			})
 
-			// --- Grup yang memerlukan peran admin (di dalam grup yang sudah terotentikasi) ---
-			/* // Komentari dulu karena middleware AdminRole belum dibuat
-			adminOnly := authRequired.Group("/") // Atau bisa juga "/admin" -> /api/admin/comics
-			adminOnly.Use(middleware.AdminRoleMiddleware(cfg)) // Kita akan buat middleware ini
+			// --- Grup yang memerlukan peran admin (setelah otentikasi dasar) ---
+			adminProtected := authRequired.Group("/")            // Mewarisi AuthMiddleware dari authRequired
+			adminProtected.Use(middleware.AdminRoleMiddleware()) // Tambahkan middleware peran admin
 			{
-				// Contoh route untuk admin (akan diimplementasikan nanti):
-				// adminOnly.POST("/comics", comicshandler.CreateComicHandler)
-				// adminOnly.PUT("/comics/:id", comicshandler.UpdateComicHandler)
-				// adminOnly.DELETE("/comics/:id", comicshandler.DeleteComicHandler)
+				adminProtected.POST("/comics", comicshandler.CreateComicHandler) // <-- ROUTE BARU CREATE COMIC
+				// Tambahkan endpoint admin lainnya di sini, misal:
+				// adminProtected.PUT("/comics/:id", comicshandler.UpdateComicHandler)
+				// adminProtected.DELETE("/comics/:id", comicshandler.DeleteComicHandler)
+				// adminProtected.POST("/genres", genrehandler.CreateGenreHandler)
 			}
-			*/
 		}
 	}
 
