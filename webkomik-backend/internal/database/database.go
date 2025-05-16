@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"github.com/TubagusAldiMY/go-vue-WebKomik/webkomik-backend/internal/models"
+	"github.com/jackc/pgx/v5"
 	"log"
 	"time"
 
@@ -123,4 +124,109 @@ func GetAllComics(ctx context.Context) ([]models.Comic, error) {
 	}
 
 	return comics, nil
+}
+
+// GetComicByID mengambil detail satu komik berdasarkan ID.
+func GetComicByID(ctx context.Context, id int64) (*models.Comic, error) {
+	query := `
+		SELECT 
+			c.id, c.title, c.description, c.author_name, 
+			c.genre_id, g.name AS genre_name, 
+			c.cover_image_url, c.created_at, c.updated_at
+		FROM comics c
+		LEFT JOIN genres g ON c.genre_id = g.id
+		WHERE c.id = $1;
+	`
+	var comic models.Comic
+	err := DB.QueryRow(ctx, query, id).Scan(
+		&comic.ID,
+		&comic.Title,
+		&comic.Description,
+		&comic.AuthorName,
+		&comic.GenreID,
+		&comic.GenreName,
+		&comic.CoverImageURL,
+		&comic.CreatedAt,
+		&comic.UpdatedAt,
+	)
+	if err != nil {
+		if err == pgx.ErrNoRows {
+			return nil, nil // Komik tidak ditemukan, bukan error server
+		}
+		return nil, fmt.Errorf("gagal query GetComicByID: %w", err)
+	}
+	return &comic, nil
+}
+
+// GetChaptersByComicID mengambil semua chapter untuk comicID tertentu.
+func GetChaptersByComicID(ctx context.Context, comicID int64) ([]models.Chapter, error) {
+	query := `
+		SELECT id, comic_id, chapter_number, title, created_at, updated_at
+		FROM chapters
+		WHERE comic_id = $1
+		ORDER BY chapter_number ASC;
+	`
+	rows, err := DB.Query(ctx, query, comicID)
+	if err != nil {
+		return nil, fmt.Errorf("gagal query GetChaptersByComicID: %w", err)
+	}
+	defer rows.Close()
+
+	var chapters []models.Chapter
+	for rows.Next() {
+		var ch models.Chapter
+		err := rows.Scan(
+			&ch.ID,
+			&ch.ComicID,
+			&ch.ChapterNumber,
+			&ch.Title,
+			&ch.CreatedAt,
+			&ch.UpdatedAt,
+		)
+		if err != nil {
+			log.Printf("Error scanning chapter row: %v\n", err)
+			continue
+		}
+		chapters = append(chapters, ch)
+	}
+	if err = rows.Err(); err != nil {
+		return nil, fmt.Errorf("error iterasi baris chapter: %w", err)
+	}
+	return chapters, nil
+}
+
+// GetPagesByChapterID mengambil semua halaman untuk chapterID tertentu.
+func GetPagesByChapterID(ctx context.Context, chapterID int64) ([]models.Page, error) {
+	query := `
+		SELECT id, chapter_id, image_url, page_number, created_at
+		FROM pages
+		WHERE chapter_id = $1
+		ORDER BY page_number ASC;
+	`
+	rows, err := DB.Query(ctx, query, chapterID)
+	if err != nil {
+		return nil, fmt.Errorf("gagal query GetPagesByChapterID: %w", err)
+	}
+	defer rows.Close()
+
+	var pages []models.Page
+	for rows.Next() {
+		var p models.Page
+		err := rows.Scan(
+			&p.ID,
+			&p.ChapterID,
+			&p.ImageURL,
+			&p.PageNumber,
+			&p.CreatedAt,
+		)
+		if err != nil {
+			log.Printf("Error scanning page row: %v\n", err)
+			continue
+		}
+		pages = append(pages, p)
+	}
+	if err = rows.Err(); err != nil {
+		return nil, fmt.Errorf("error iterasi baris page: %w", err)
+	}
+	return pages, nil
 }
