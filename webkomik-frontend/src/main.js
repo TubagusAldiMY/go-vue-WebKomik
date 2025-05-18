@@ -1,19 +1,14 @@
+// src/main.js
 import { createApp } from 'vue'
-import './style.css'
+import { createPinia } from 'pinia'
 import App from './App.vue'
-import { supabase } from './lib/supabaseClient' // <-- Import supabase client
+import router from './router' // Pastikan path ini benar ke src/router/index.js
+import './style.css'
 
-console.log('Supabase instance:', supabase) // <-- Tes logging
+const app = createApp(App)
+const pinia = createPinia()
 
-// Contoh sederhana mengambil data sesi (jika ada)
-async function checkUserSession() {
-    const { data: { session } } = await supabase.auth.getSession()
-    if (session) {
-        console.log('Sesi pengguna ditemukan:', session)
-    } else {
-        console.log('Tidak ada sesi pengguna aktif.')
-    }
-}
-checkUserSession();
+app.use(router) // Router digunakan di sini
+app.use(pinia)
 
-createApp(App).mount('#app')
+app.mount('#app')

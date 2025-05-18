@@ -1,30 +1,42 @@
 <script setup>
-import HelloWorld from './components/HelloWorld.vue'
+import { onMounted } from 'vue'
+import { useAuthStore } from '@/stores/authStore'
+import { RouterLink, RouterView } from 'vue-router' // Import RouterView jika belum
+
+const auth = useAuthStore()
+
+onMounted(() => {
+  auth.fetchUserSession() // Panggil saat komponen App di-mount
+})
+
+async function handleLogout() {
+  await auth.logout()
+}
 </script>
 
 <template>
-  <div>
-    <a href="https://vite.dev" target="_blank">
-      <img src="/vite.svg" class="logo" alt="Vite logo" />
-    </a>
-    <a href="https://vuejs.org/" target="_blank">
-      <img src="./assets/vue.svg" class="logo vue" alt="Vue logo" />
-    </a>
+  <div id="app-wrapper" class="min-h-screen bg-gray-50 text-gray-800">
+    <header class="bg-white shadow-sm" v-if="auth.isAuthenticated">
+      <nav class="container mx-auto px-4 py-3 flex justify-between items-center">
+        <RouterLink :to="{ name: 'Home' }" class="text-xl font-semibold text-gray-800">WebKomik</RouterLink>
+        <div>
+          <span class="text-sm text-gray-600 mr-4">Welcome, {{ auth.userEmail }}</span>
+          <button
+              @click="handleLogout"
+              class="text-sm font-medium text-indigo-600 hover:text-indigo-500 px-3 py-1 border border-indigo-600 rounded hover:bg-indigo-50 transition-colors"
+          >
+            Logout
+          </button>
+        </div>
+      </nav>
+    </header>
+
+    <main class="container mx-auto p-4 mt-4">
+      <RouterView />
+    </main>
   </div>
-  <HelloWorld msg="Vite + Vue" />
 </template>
 
 <style scoped>
-.logo {
-  height: 6em;
-  padding: 1.5em;
-  will-change: filter;
-  transition: filter 300ms;
-}
-.logo:hover {
-  filter: drop-shadow(0 0 2em #646cffaa);
-}
-.logo.vue:hover {
-  filter: drop-shadow(0 0 2em #42b883aa);
-}
+/* Style scoped khusus untuk App.vue jika diperlukan */
 </style>

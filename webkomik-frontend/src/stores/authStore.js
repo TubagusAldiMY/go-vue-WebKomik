@@ -1,0 +1,152 @@
+// src/stores/authStore.js
+import { defineStore } from 'pinia'
+import { ref, computed } from 'vue'
+import { supabase } from '../lib/supabaseClient' // Pastikan path ini benar
+import router from '../router' // Import router untuk navigasi
+
+export const useAuthStore = defineStore('auth', () => {
+    // State
+    const user = ref(null) // Akan menyimpan data user dari Supabase (profile, dll.)
+    const session = ref(null) // Akan menyimpan data sesi dari Supabase
+    const loading = ref(false)
+    const error = ref(null)
+    const returnUrl = ref(null) // Untuk redirect setelah login
+
+    // Getters (computed properties)
+    const isAuthenticated = computed(() => !!session.value && !!session.value.user)
+    const userEmail = computed(() => session.value?.user?.email || null)
+    const userId = computed(() => session.value?.user?.id || null)
+
+    // Actions
+    async function fetchUserSession() {
+        loading.value = true
+        error.value = null
+        try {
+            const { data, error: sessionError } = await supabase.auth.getSession()
+            if (sessionError) throw sessionError
+            session.value = data.session
+            if (data.session?.user) {
+                // Anda bisa mengambil detail profil pengguna dari tabel 'profiles' jika ada
+                user.value = data.session.user // Untuk sementara, user adalah objek user dari sesi
+            } else {
+                user.value = null
+            }
+        } catch (e) {
+            error.value = e.message
+            console.error('Error fetching session:', e.message)
+        } finally {
+            loading.value = false
+        }
+    }
+
+    async function loginWithPassword(credentials) {
+        loading.value = true
+        error.value = null
+        try {
+            const { data, error: loginError } = await supabase.auth.signInWithPassword({
+                email: credentials.email,
+                password: credentials.password,
+            })
+            if (loginError) throw loginError
+            session.value = data.session
+            user.value = data.user
+
+            // Navigasi setelah login berhasil
+            if (returnUrl.value) {
+                router.push(returnUrl.value)
+                returnUrl.value = null // Reset returnUrl
+            } else {
+                router.push({ name: 'Home' }) // Redirect ke halaman Home atau dashboard
+            }
+
+        } catch (e) {
+            error.value = e.message
+            console.error('Login error:', e.message)
+            // Pastikan user dan session di-null-kan jika login gagal
+            session.value = null
+            user.value = null
+        } finally {
+            loading.value = false
+        }
+    }
+
+    async function signUp(credentials) {
+        loading.value = true;
+        error.value = null;
+        try {
+            const { data, error: signUpError } = await supabase.auth.signUp({
+                email: credentials.email,
+                password: credentials.password,
+                // Anda bisa menambahkan options seperti data untuk user_metadata di sini jika perlu
+                // options: {
+                //   data: {
+                //     full_name: credentials.fullName, // contoh
+                //   }
+                // }
+            });
+            if (signUpError) throw signUpError;
+
+            // Supabase mungkin mengirim email konfirmasi.
+            // Sesi dan user mungkin tidak langsung ada sampai email dikonfirmasi,
+            // tergantung pengaturan Supabase Anda (Secure email change & Email confirmations).
+            session.value = data.session;
+            user.value = data.user;
+
+            // Beri pesan atau arahkan sesuai kebutuhan setelah sign up
+            // Misalnya, jika perlu konfirmasi email:
+            if (data.user && !data.session && data.user.identities && data.user.identities.length > 0) {
+                alert('Pendaftaran berhasil! Silakan cek email Anda untuk konfirmasi.');
+                router.push({ name: 'Login' }); // Arahkan ke login setelah info
+            } else if (data.session) {
+                // Jika sesi langsung ada (misal konfirmasi email dimatikan)
+                router.push({ name: 'Home' });
+            } else {
+                // Skenario lain, mungkin perlu penanganan khusus
+                alert('Pendaftaran diproses. Ikuti instruksi selanjutnya jika ada.');
+                router.push({ name: 'Login' });
+            }
+
+        } catch (e) {
+            error.value = e.message;
+            console.error('Sign up error:', e.message);
+        } finally {
+            loading.value = false;
+        }
+    }
+
+
+    async function logout() {
+        loading.value = true
+        error.value = null
+        try {
+            const { error: logoutError } = await supabase.auth.signOut()
+            if (logoutError) throw logoutError
+            user.value = null
+            session.value = null
+            router.push({ name: 'Login' }) // Redirect ke halaman Login setelah logout
+        } catch (e) {
+            error.value = e.message
+            console.error('Logout error:', e.message)
+        } finally {
+            loading.value = false
+        }
+    }
+
+    // Panggil fetchUserSession saat store diinisialisasi untuk memeriksa sesi yang ada
+    // fetchUserSession() // Panggil ini di App.vue atau saat mounting utama
+
+    return {
+        user,
+        session,
+        loading,
+        error,
+        isAuthenticated,
+        userEmail,
+        userId,
+        returnUrl,
+        fetchUserSession,
+        loginWithPassword,
+        signUp,
+        logout,
+    }
+})
