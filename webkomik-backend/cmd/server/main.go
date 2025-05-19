@@ -3,6 +3,7 @@ package main
 
 import (
 	"context"
+	"github.com/gin-contrib/cors"
 	"log"
 	"net/http"
 	"os"
@@ -33,6 +34,16 @@ func main() {
 
 	// Inisialisasi Gin router
 	router := gin.Default()
+
+	// Konfigurasi CORS yang lebih spesifik untuk pengembangan lokal
+	router.Use(cors.New(cors.Config{
+		AllowOrigins:     []string{"http://localhost:5173"}, // Ganti dengan URL frontend Vite Anda
+		AllowMethods:     []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},
+		AllowHeaders:     []string{"Origin", "Content-Type", "Accept", "Authorization"},
+		ExposeHeaders:    []string{"Content-Length"},
+		AllowCredentials: true, // Jika Anda menggunakan credentials seperti cookies atau auth headers
+		MaxAge:           12 * time.Hour,
+	}))
 
 	// Middleware global jika ada (misalnya, CORS, logging tambahan)
 	// router.Use(corsMiddleware()) // Contoh
