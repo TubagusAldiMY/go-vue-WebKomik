@@ -25,11 +25,12 @@ const routes = [
         component: () => import('../views/RegisterView.vue') // Lazy load
     },
     // Tambahkan route lain di sini, misalnya untuk detail komik:
-    // {
-    //   path: '/comic/:id',
-    //   name: 'ComicDetail',
-    //   component: () => import('../views/ComicDetailView.vue')
-    // },
+    {
+        path: '/comic/:id', // :id adalah parameter dinamis
+        name: 'ComicDetail',
+        component: () => import('../views/ComicDetailView.vue'), // Lazy load
+        props: true // Ini akan meneruskan route.params sebagai props ke komponen
+    },
 ]
 
 const router = createRouter({
