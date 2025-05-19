@@ -28,11 +28,12 @@ func ConnectDB(cfg *config.Config) error {
 	)
 
 	var err error
-	// ParseConfig akan memvalidasi connection string dan membuat config untuk pool
 	dbConfig, err := pgxpool.ParseConfig(connString)
 	if err != nil {
 		return fmt.Errorf("gagal parse konfigurasi database: %w", err)
 	}
+
+	dbConfig.ConnConfig.DefaultQueryExecMode = pgx.QueryExecModeSimpleProtocol
 
 	// Anda bisa mengatur parameter pool lainnya di sini jika perlu
 	// dbConfig.MaxConns = 10 // Contoh, sudah diatur di connString juga

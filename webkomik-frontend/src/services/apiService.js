@@ -28,7 +28,8 @@ async function request(endpoint, options = {}) {
     };
 
     try {
-        const response = await fetch(`<span class="math-inline">\{BASE\_URL\}</span>{endpoint}`, config);
+        console.log(`[apiService] Requesting URL: ${BASE_URL}${endpoint}`); // <--- TAMBAHKAN INI UNTUK DEBUGGING
+        const response = await fetch(`${BASE_URL}${endpoint}`, config);
         if (!response.ok) {
             const errorData = await response.json().catch(() => ({ message: response.statusText }));
             // Buat error yang lebih informatif
