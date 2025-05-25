@@ -10,13 +10,22 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 )
 
-// Claims adalah struktur untuk custom claims di JWT Anda.
-// Supabase menggunakan 'sub' untuk user ID.
-// Anda bisa menambahkan 'role' atau claims lain jika sudah dikonfigurasi di Supabase JWT.
+// Role constants for the application
+const (
+	RoleAdmin   = "admin"
+	RoleCreator = "creator"
+	RoleUser    = "user"
+)
+
+type AppMetadata struct {
+	Role string `json:"role,omitempty"`
+	// Tambahkan field lain dari app_metadata jika perlu
+}
+
+// Claims struct
 type Claims struct {
-	UserID string `json:"sub"`            // Standar claim untuk Subject (User ID)
-	Role   string `json:"role,omitempty"` // Contoh custom claim 'role'
-	// Tambahkan claims lain yang mungkin ada di Supabase JWT Anda
+	UserID      string      `json:"sub"`
+	AppMeta     AppMetadata `json:"app_metadata,omitempty"` // Untuk membaca dari app_metadata
 	jwt.RegisteredClaims
 }
 
@@ -64,43 +73,78 @@ func AuthMiddleware(cfg *config.Config) gin.HandlerFunc {
 			return
 		}
 
-		// Jika token valid, simpan informasi pengguna (misalnya UserID dan Role) ke dalam context Gin
-		// sehingga bisa diakses oleh handler berikutnya.
+		// Set user ID from the token
 		c.Set("userID", claims.UserID)
-		if claims.Role != "" {
-			c.Set("userRole", claims.Role)
+
+		// Jika token valid, simpan informasi pengguna (UserID dan Role) ke dalam context Gin
+		if claims.AppMeta.Role != "" {
+			c.Set("userRole", claims.AppMeta.Role)
+		} else {
+			// Set default role to 'user' if no role is specified
+			c.Set("userRole", RoleUser)
 		}
 
 		c.Next() // Lanjutkan ke handler berikutnya
 	}
 }
 
-// AdminRoleMiddleware memeriksa apakah pengguna yang terotentikasi memiliki peran 'admin'.
-// Middleware ini harus dijalankan SETELAH AuthMiddleware.
-func AdminRoleMiddleware() gin.HandlerFunc {
+// RoleMiddleware creates a middleware that checks if the authenticated user has one of the allowed roles
+// This middleware must be run AFTER AuthMiddleware
+func RoleMiddleware(allowedRoles ...string) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		// Ambil userRole dari context yang sudah di-set oleh AuthMiddleware
+		// Get userRole from context set by AuthMiddleware
 		userRoleVal, exists := c.Get("userRole")
 		if !exists {
-			// Ini bisa terjadi jika AuthMiddleware tidak dijalankan sebelumnya
-			// atau jika 'userRole' tidak ada di token dan tidak di-set default.
-			// AuthMiddleware kita saat ini tidak men-set default jika role tidak ada, jadi ini skenario valid.
 			c.AbortWithStatusJSON(http.StatusForbidden, gin.H{"error": "Peran pengguna tidak ditemukan di konteks. Akses ditolak."})
 			return
 		}
 
 		userRole, ok := userRoleVal.(string)
 		if !ok {
-			// Tipe userRole di context bukan string, ini seharusnya tidak terjadi.
 			c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"error": "Kesalahan internal: tipe peran pengguna tidak valid."})
 			return
 		}
 
-		if strings.ToLower(userRole) != "admin" {
-			c.AbortWithStatusJSON(http.StatusForbidden, gin.H{"error": "Akses ditolak: membutuhkan peran admin."})
-			return
+		// Convert userRole to lowercase for case-insensitive comparison
+		userRole = strings.ToLower(userRole)
+
+		// Check if the user's role is in the list of allowed roles
+		for _, role := range allowedRoles {
+			if userRole == strings.ToLower(role) {
+				c.Next() // User has an allowed role, continue to the next handler
+				return
+			}
 		}
 
-		c.Next() // Pengguna adalah admin, lanjutkan ke handler berikutnya.
+		// If we get here, the user doesn't have any of the allowed roles
+		c.AbortWithStatusJSON(http.StatusForbidden, gin.H{"error": "Akses ditolak: tidak memiliki peran yang diizinkan."})
 	}
+}
+
+// AdminRoleMiddleware is a convenience wrapper for RoleMiddleware that only allows admins
+// This is kept for backward compatibility
+func AdminRoleMiddleware() gin.HandlerFunc {
+	return RoleMiddleware(RoleAdmin)
+}
+
+// AdminOrCreatorRoleMiddleware allows both admin and creator roles
+// This is useful for endpoints that should be accessible by both admins and content creators
+func AdminOrCreatorRoleMiddleware() gin.HandlerFunc {
+	return RoleMiddleware(RoleAdmin, RoleCreator)
+}
+
+// UserHasRole is a helper function to check if a user has a specific role
+// This can be used in handlers for more granular control
+func UserHasRole(c *gin.Context, role string) bool {
+	userRoleVal, exists := c.Get("userRole")
+	if !exists {
+		return false
+	}
+
+	userRole, ok := userRoleVal.(string)
+	if !ok {
+		return false
+	}
+
+	return strings.ToLower(userRole) == strings.ToLower(role)
 }

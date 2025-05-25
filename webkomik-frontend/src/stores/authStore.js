@@ -11,12 +11,38 @@ export const useAuthStore = defineStore('auth', () => {
     const loading = ref(false)
     const error = ref(null)
     const returnUrl = ref(null) // Untuk redirect setelah login
+    const userRole = ref(null)
 
     // Getters (computed properties)
     const isAuthenticated = computed(() => !!session.value && !!session.value.user)
     const userEmail = computed(() => session.value?.user?.email || null)
     const userId = computed(() => session.value?.user?.id || null)
+    const isAdmin = computed(() => userRole.value === 'admin');
 
+
+     // Fungsi untuk parse token dan ekstrak role (jika ada)
+  // Supabase JWT biasanya memiliki custom claims di dalam user.app_metadata atau user.user_metadata
+  // Atau jika Anda mengaturnya sebagai root claim.
+  // Untuk Supabase, peran biasanya ada di `session.value.user.app_metadata.role` atau `session.value.user.user_metadata.role`
+  // atau jika Anda telah membuat fungsi SQL untuk menambahkannya sebagai top-level claim.
+  // Kita asumsikan role ada di `app_metadata.role` atau `user_metadata.role` untuk contoh ini.
+    function updateUserRoleFromSession() {
+    if (session.value && session.value.user) {
+        // Coba dari app_metadata dulu
+        if (session.value.user.app_metadata && session.value.user.app_metadata.role) {
+        userRole.value = session.value.user.app_metadata.role;
+        }
+        // Jika tidak ada, coba dari user_metadata
+        else if (session.value.user.user_metadata && session.value.user.user_metadata.role) {
+        userRole.value = session.value.user.user_metadata.role;
+        }
+        else {
+        userRole.value = 'user'; // Default
+        }
+    } else {
+        userRole.value = null;
+    }
+    }
     // Actions
     async function fetchUserSession() {
         loading.value = true
@@ -26,10 +52,11 @@ export const useAuthStore = defineStore('auth', () => {
             if (sessionError) throw sessionError
             session.value = data.session
             if (data.session?.user) {
-                // Anda bisa mengambil detail profil pengguna dari tabel 'profiles' jika ada
-                user.value = data.session.user // Untuk sementara, user adalah objek user dari sesi
+                user.value = data.session.user;
+                updateUserRoleFromSession();
             } else {
                 user.value = null
+                userRole.value = null // Reset userRole jika tidak ada sesi
             }
         } catch (e) {
             error.value = e.message
@@ -48,8 +75,11 @@ export const useAuthStore = defineStore('auth', () => {
                 password: credentials.password,
             })
             if (loginError) throw loginError
-            session.value = data.session
-            user.value = data.user
+            if (data.session && data.user) {
+                session.value = data.session;
+                user.value = data.user;
+                updateUserRoleFromSession(); // <-- PANGGIL FUNGSI INI
+    }
 
             // Navigasi setelah login berhasil
             if (returnUrl.value) {
@@ -65,6 +95,7 @@ export const useAuthStore = defineStore('auth', () => {
             // Pastikan user dan session di-null-kan jika login gagal
             session.value = null
             user.value = null
+            userRole.value = null;
         } finally {
             loading.value = false
         }
@@ -123,6 +154,7 @@ export const useAuthStore = defineStore('auth', () => {
             if (logoutError) throw logoutError
             user.value = null
             session.value = null
+            userRole.value = null;
             router.push({ name: 'Login' }) // Redirect ke halaman Login setelah logout
         } catch (e) {
             error.value = e.message
@@ -143,6 +175,8 @@ export const useAuthStore = defineStore('auth', () => {
         isAuthenticated,
         userEmail,
         userId,
+        userRole,
+        isAdmin,
         returnUrl,
         fetchUserSession,
         loginWithPassword,

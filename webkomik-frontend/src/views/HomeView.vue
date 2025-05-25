@@ -13,10 +13,7 @@ onMounted(() => {
 });
 
 function goToCreateComicPage() {
-  // Nanti kita akan buat halaman admin untuk ini.
-  // Untuk sementara, bisa arahkan ke route yang belum ada atau tampilkan alert.
-  alert('Halaman tambah komik untuk admin belum dibuat.');
-  // Contoh jika sudah ada: router.push({ name: 'AdminCreateComic' });
+  router.push({ name: 'AdminCreateComic' }); // <-- UBAH BARIS INI
 }
 </script>
 

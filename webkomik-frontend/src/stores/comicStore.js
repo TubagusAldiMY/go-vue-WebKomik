@@ -1,7 +1,7 @@
 // src/stores/comicStore.js
 import { defineStore } from 'pinia';
 import { ref } from 'vue';
-import { getComics, getComicDetail } from '@/services/apiService'; // Pastikan path ini benar
+import { getComics, getComicDetail, createComic as apiCreateComic } from '@/services/apiService'; // Pastikan path ini benar
 
 export const useComicStore = defineStore('comics', () => {
     // State
@@ -64,13 +64,50 @@ export const useComicStore = defineStore('comics', () => {
     //   }
     // }
 
-    return {
-        comicsList,
-        currentComic,
-        loading,
-        error,
-        fetchAllComics,
-        fetchComicById,
-        // createNewComic,
-    };
+    async function createNewComic(comicData) {
+    loading.value = true;
+    error.value = null;
+    try {
+      // Pastikan data yang dikirim hanya yang diperlukan oleh CreateComicInput di backend
+      // atau model Comic di backend.
+      const payload = {
+        title: comicData.title,
+        description: comicData.description || null,
+        author_name: comicData.author_name || null,
+        genre_id: comicData.genre_id || null,
+        cover_image_url: comicData.cover_image_url || null,
+      };
+
+      const response = await apiCreateComic(payload); // Panggil fungsi dari apiService
+
+      // Setelah berhasil, mungkin kita ingin refresh daftar komik atau navigasi
+      await fetchAllComics(); // Contoh: fetch ulang daftar komik di halaman Beranda
+      return response.data; // Kembalikan data komik yang baru dibuat (dari field 'data' di respons)
+    } catch (e) {
+      // apiService sudah melempar error yang lebih baik
+      // e.data mungkin berisi detail error validasi dari backend
+      if (e.data && e.data.details) {
+        error.value = `Input tidak valid: ${e.data.details}`;
+      } else if (e.data && e.data.error) {
+        error.value = e.data.error;
+      }
+      else {
+        error.value = e.message || 'Gagal membuat komik baru.';
+      }
+      console.error('Error creating comic in store:', e);
+      throw e; // Lempar ulang error agar bisa ditangani lebih lanjut jika perlu
+    } finally {
+      loading.value = false;
+    }
+  }
+
+  return {
+    comicsList,
+    currentComic,
+    loading,
+    error,
+    fetchAllComics,
+    fetchComicById,
+    createNewComic, // <-- EXPOSE ACTION BARU
+  };
 });

@@ -99,15 +99,23 @@ func main() {
 				})
 			})
 
-			// --- Grup yang memerlukan peran admin (setelah otentikasi dasar) ---
-			adminProtected := authRequired.Group("/")            // Mewarisi AuthMiddleware dari authRequired
-			adminProtected.Use(middleware.AdminRoleMiddleware()) // Tambahkan middleware peran admin
+			// --- Grup yang dapat diakses oleh admin dan creator (untuk mengelola konten) ---
+			contentManager := authRequired.Group("/")                       // Mewarisi AuthMiddleware dari authRequired
+			contentManager.Use(middleware.AdminOrCreatorRoleMiddleware()) // Memungkinkan admin DAN creator mengakses
 			{
-				adminProtected.POST("/comics", comicshandler.CreateComicHandler) // <-- ROUTE BARU CREATE COMIC
-				// Tambahkan endpoint admin lainnya di sini, misal:
-				// adminProtected.PUT("/comics/:id", comicshandler.UpdateComicHandler)
+				contentManager.POST("/comics", comicshandler.CreateComicHandler) // Endpoint pembuatan komik baru
+				// Tambahkan endpoint pengelolaan konten lain di sini
+				// contentManager.PUT("/comics/:id", comicshandler.UpdateComicHandler)
+			}
+
+			// --- Grup yang memerlukan peran admin saja (untuk fitur administrasi) ---
+			adminProtected := authRequired.Group("/")            // Mewarisi AuthMiddleware dari authRequired
+			adminProtected.Use(middleware.AdminRoleMiddleware()) // Hanya admin yang dapat mengakses
+			{
+				// Endpoint khusus admin seperti penghapusan, manajemen user, dll
 				// adminProtected.DELETE("/comics/:id", comicshandler.DeleteComicHandler)
 				// adminProtected.POST("/genres", genrehandler.CreateGenreHandler)
+				// adminProtected.GET("/users", userhandler.GetAllUsersHandler)
 			}
 		}
 	}
