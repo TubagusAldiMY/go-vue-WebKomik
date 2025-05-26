@@ -58,7 +58,7 @@ export const getComicDetail = (id) => {
 };
 
 export const createComic = (comicData) => {
-    // Endpoint ini memerlukan otentikasi dan peran admin
+    // Endpoint ini memerlukan otentikasi dan peran admin atau creator
     // Kita akan menandainya agar token ditambahkan
     return request('/comics', {
         method: 'POST',
@@ -67,4 +67,13 @@ export const createComic = (comicData) => {
     });
 };
 
-// Tambahkan fungsi lain di sini (updateComic, deleteComic, dll.)
+export const updateComic = (id, comicData) => {
+    // Endpoint ini memerlukan otentikasi dan peran admin atau creator
+    return request(`/comics/${id}`, {
+        method: 'PUT',
+        body: JSON.stringify(comicData),
+        requiresAuth: true, // Tandai bahwa endpoint ini butuh token
+    });
+};
+
+// Tambahkan fungsi lain di sini (deleteComic, dll.)
