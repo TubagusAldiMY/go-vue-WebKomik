@@ -283,3 +283,117 @@ func CreateComic(ctx context.Context, input models.Comic, adminID string) (*mode
 
 	return &createdComic, nil
 }
+
+// UpdateComic memperbarui data komik yang sudah ada di database.
+// Ia mengembalikan komik yang telah diperbarui atau error.
+// userID adalah ID pengguna (dari Supabase auth.users.id) yang melakukan pembaruan.
+func UpdateComic(ctx context.Context, comicID int64, updates map[string]interface{}, userID string) (*models.Comic, error) {
+	// 1. Periksa apakah komik dengan ID yang diminta ada
+	existingComic, err := GetComicByID(ctx, comicID)
+	if err != nil {
+		return nil, fmt.Errorf("gagal memeriksa komik: %w", err)
+	}
+	if existingComic == nil {
+		return nil, fmt.Errorf("komik dengan ID %d tidak ditemukan", comicID)
+	}
+
+	// 2. Membangun query update dinamis berdasarkan field yang diberikan
+	setClauses := ""
+	values := []interface{}{}
+	paramCounter := 1
+
+	if title, ok := updates["title"].(string); ok {
+		if setClauses != "" {
+			setClauses += ", "
+		}
+		setClauses += fmt.Sprintf("title = $%d", paramCounter)
+		values = append(values, title)
+		paramCounter++
+	}
+
+	if description, ok := updates["description"].(*string); ok {
+		if setClauses != "" {
+			setClauses += ", "
+		}
+		setClauses += fmt.Sprintf("description = $%d", paramCounter)
+		values = append(values, description)
+		paramCounter++
+	}
+
+	if authorName, ok := updates["author_name"].(*string); ok {
+		if setClauses != "" {
+			setClauses += ", "
+		}
+		setClauses += fmt.Sprintf("author_name = $%d", paramCounter)
+		values = append(values, authorName)
+		paramCounter++
+	}
+
+	if genreID, ok := updates["genre_id"].(*int64); ok {
+		if setClauses != "" {
+			setClauses += ", "
+		}
+		setClauses += fmt.Sprintf("genre_id = $%d", paramCounter)
+		values = append(values, genreID)
+		paramCounter++
+	}
+
+	if coverImageURL, ok := updates["cover_image_url"].(*string); ok {
+		if setClauses != "" {
+			setClauses += ", "
+		}
+		setClauses += fmt.Sprintf("cover_image_url = $%d", paramCounter)
+		values = append(values, coverImageURL)
+		paramCounter++
+	}
+
+	// Selalu update kolom updated_at
+	if setClauses != "" {
+		setClauses += ", "
+	}
+	setClauses += fmt.Sprintf("updated_at = $%d", paramCounter)
+	values = append(values, time.Now())
+	paramCounter++
+
+	// Tambahkan ID komik sebagai parameter terakhir untuk klausa WHERE
+	values = append(values, comicID)
+
+	// 3. Jalankan query update
+	query := fmt.Sprintf(`
+		UPDATE comics
+		SET %s
+		WHERE id = $%d
+		RETURNING id, title, description, author_name, genre_id, cover_image_url, uploaded_by_admin_id, created_at, updated_at;
+	`, setClauses, paramCounter)
+
+	var updatedComic models.Comic
+	err = DB.QueryRow(ctx, query, values...).Scan(
+		&updatedComic.ID,
+		&updatedComic.Title,
+		&updatedComic.Description,
+		&updatedComic.AuthorName,
+		&updatedComic.GenreID,
+		&updatedComic.CoverImageURL,
+		&updatedComic.UploadedByAdminID,
+		&updatedComic.CreatedAt,
+		&updatedComic.UpdatedAt,
+	)
+
+	if err != nil {
+		return nil, fmt.Errorf("gagal memperbarui komik di database: %w", err)
+	}
+
+	// 4. Ambil nama genre jika ada genre_id
+	if updatedComic.GenreID != nil {
+		var genreName string
+		errGenre := DB.QueryRow(ctx, "SELECT name FROM genres WHERE id = $1", *updatedComic.GenreID).Scan(&genreName)
+		if errGenre == nil {
+			updatedComic.GenreName = &genreName
+		} else if errGenre != pgx.ErrNoRows {
+			// Log error tapi jangan gagalkan pembaruan komik utama
+			log.Printf("Peringatan: Gagal mengambil nama genre untuk komik ID %d: %v", updatedComic.ID, errGenre)
+		}
+	}
+
+	return &updatedComic, nil
+}
