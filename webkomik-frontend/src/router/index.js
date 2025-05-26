@@ -36,8 +36,15 @@ const routes = [
     {
         path: '/admin/comics/create',
         name: 'AdminCreateComic',
-        component: () => import('../views/admin/AdminCreateComicView.vue'), // Buat view ini
-        meta: { requiresAuth: true, requiresAdmin: true } // Meta untuk navigation guard
+        component: () => import('../views/admin/AdminCreateComicView.vue'),
+        meta: { requiresAuth: true } // Sekarang bisa diakses oleh admin dan creator
+    },
+    {
+        path: '/admin/comics/:id/edit',
+        name: 'AdminEditComic',
+        component: () => import('../views/admin/AdminEditComicView.vue'),
+        meta: { requiresAuth: true }, // Bisa diakses oleh admin dan creator
+        props: true // Meneruskan route.params sebagai props
     },
 ]
 
