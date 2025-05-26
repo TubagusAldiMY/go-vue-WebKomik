@@ -104,8 +104,7 @@ func main() {
 			contentManager.Use(middleware.AdminOrCreatorRoleMiddleware()) // Memungkinkan admin DAN creator mengakses
 			{
 				contentManager.POST("/comics", comicshandler.CreateComicHandler) // Endpoint pembuatan komik baru
-				// Tambahkan endpoint pengelolaan konten lain di sini
-				// contentManager.PUT("/comics/:id", comicshandler.UpdateComicHandler)
+				contentManager.PUT("/comics/:id", comicshandler.UpdateComicHandler) // Endpoint update komik
 			}
 
 			// --- Grup yang memerlukan peran admin saja (untuk fitur administrasi) ---
