@@ -100,6 +100,44 @@ export const useComicStore = defineStore('comics', () => {
       loading.value = false;
     }
   }
+  
+  async function updateExistingComic(id, comicData) {
+    loading.value = true;
+    error.value = null;
+    try {
+      // Hanya kirim field yang memang ada nilainya (untuk update parsial)
+      const payload = {};
+      if (comicData.title !== undefined && comicData.title !== null) payload.title = comicData.title;
+      if (comicData.description !== undefined) payload.description = comicData.description;
+      if (comicData.author_name !== undefined) payload.author_name = comicData.author_name;
+      if (comicData.genre_id !== undefined) payload.genre_id = comicData.genre_id || null;
+      if (comicData.cover_image_url !== undefined) payload.cover_image_url = comicData.cover_image_url;
+      
+      // Panggil fungsi updateComic dari apiService
+      const response = await updateComic(id, payload);
+      
+      // Perbarui daftar komik dan data komik saat ini jika sama
+      await fetchAllComics();
+      if (currentComic.value && currentComic.value.id === id) {
+        currentComic.value = response.data;
+      }
+      
+      return response.data; // Kembalikan data komik yang telah diperbarui
+    } catch (e) {
+      // Handle error seperti pada createNewComic
+      if (e.data && e.data.details) {
+        error.value = `Input tidak valid: ${e.data.details}`;
+      } else if (e.data && e.data.error) {
+        error.value = e.data.error;
+      } else {
+        error.value = e.message || `Gagal memperbarui komik ID ${id}.`;
+      }
+      console.error(`Error updating comic ID ${id}:`, e);
+      throw e;
+    } finally {
+      loading.value = false;
+    }
+  }
 
   return {
     comicsList,
@@ -108,6 +146,7 @@ export const useComicStore = defineStore('comics', () => {
     error,
     fetchAllComics,
     fetchComicById,
-    createNewComic, // <-- EXPOSE ACTION BARU
+    createNewComic,
+    updateExistingComic, // Expose new update action
   };
 });
